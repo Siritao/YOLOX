@@ -14,6 +14,8 @@ from yolox.core import launch
 from yolox.exp import Exp, get_exp
 from yolox.utils import configure_module, configure_nccl, configure_omp, get_num_devices
 
+from patch_gpu_to_cpu import patch_cuda
+
 
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX train parser")
@@ -119,6 +121,7 @@ def main(exp: Exp, args):
 
 
 if __name__ == "__main__":
+    patch_cuda()
     configure_module()
     args = make_parser().parse_args()
     exp = get_exp(args.exp_file, args.name)
