@@ -11,7 +11,8 @@ import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
-from yolox.data import DataPrefetcher
+from bigdl.nano.pytorch import TorchNano
+
 from yolox.exp import Exp
 from yolox.utils import (
     MeterBuffer,
@@ -33,8 +34,15 @@ from yolox.utils import (
 )
 
 
-class Trainer:
+class Trainer(TorchNano):
     def __init__(self, exp: Exp, args):
+        try:
+            args.precision = int(args.precision)
+        except:
+            args.precision = args.precision
+        super().__init__(use_ipex=args.use_ipex, precision=args.precision,
+            num_processes=args.num_processes, strategy=args.strategy
+        )
         # init function only defines some basic attr, other attrs like model, optimizer are built in
         # before_train methods.
         self.exp = exp
@@ -43,11 +51,8 @@ class Trainer:
         # training related attr
         self.max_epoch = exp.max_epoch
         self.amp_training = args.fp16
-        self.scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
-        self.is_distributed = get_world_size() > 1
-        self.rank = get_rank()
-        self.local_rank = get_local_rank()
-        self.device = "cuda:{}".format(self.local_rank)
+        self.is_distributed = self.world_size > 1
+        self.rank = self.global_rank
         self.use_model_ema = exp.ema
         self.save_history_ckpt = exp.save_history_ckpt
 
@@ -94,25 +99,21 @@ class Trainer:
     def train_one_iter(self):
         iter_start_time = time.time()
 
-        inps, targets = self.prefetcher.next()
-        inps = inps.to(self.data_type)
-        targets = targets.to(self.data_type)
+        inps, targets, *_ = next(iter(self.train_loader))
         targets.requires_grad = False
         inps, targets = self.exp.preprocess(inps, targets, self.input_size)
         data_end_time = time.time()
 
-        with torch.cuda.amp.autocast(enabled=self.amp_training):
-            outputs = self.model(inps, targets)
+        outputs = self.model(inps, targets)
 
         loss = outputs["total_loss"]
 
         self.optimizer.zero_grad()
-        self.scaler.scale(loss).backward()
-        self.scaler.step(self.optimizer)
-        self.scaler.update()
+        self.backward(loss)
+        self.optimizer.step()
 
         if self.use_model_ema:
-            self.ema_model.update(self.model)
+            self.ema_model.update(self.model.module)
 
         lr = self.lr_scheduler.update_lr(self.progress_in_iter + 1)
         for param_group in self.optimizer.param_groups:
@@ -131,18 +132,16 @@ class Trainer:
         logger.info("exp value:\n{}".format(self.exp))
 
         # model related init
-        torch.cuda.set_device(self.local_rank)
-        model = self.exp.get_model()
+        self.model = self.exp.get_model()
         logger.info(
-            "Model Summary: {}".format(get_model_info(model, self.exp.test_size))
+            "Model Summary: {}".format(get_model_info(self.model, self.exp.test_size))
         )
-        model.to(self.device)
 
         # solver related init
         self.optimizer = self.exp.get_optimizer(self.args.batch_size)
 
         # value of epoch will be set in `resume_train`
-        model = self.resume_train(model)
+        self.model = self.resume_train(self.model)
 
         # data related init
         self.no_aug = self.start_epoch >= self.max_epoch - self.exp.no_aug_epochs
@@ -152,25 +151,20 @@ class Trainer:
             no_aug=self.no_aug,
             cache_img=self.args.cache,
         )
-        logger.info("init prefetcher, this might take one minute or less...")
-        self.prefetcher = DataPrefetcher(self.train_loader)
         # max_iter means iters per epoch
         self.max_iter = len(self.train_loader)
 
         self.lr_scheduler = self.exp.get_lr_scheduler(
             self.exp.basic_lr_per_img * self.args.batch_size, self.max_iter
         )
-        if self.args.occupy:
-            occupy_mem(self.local_rank)
 
-        if self.is_distributed:
-            model = DDP(model, device_ids=[self.local_rank], broadcast_buffers=False)
+        self.model, self.optimizer, self.train_loader = self.setup(
+            self.model, self.optimizer, self.train_loader
+        )
 
         if self.use_model_ema:
-            self.ema_model = ModelEMA(model, 0.9998)
+            self.ema_model = ModelEMA(self.model.module, 0.9998)
             self.ema_model.updates = self.max_iter * self.start_epoch
-
-        self.model = model
 
         self.evaluator = self.exp.get_evaluator(
             batch_size=self.args.batch_size, is_distributed=self.is_distributed
@@ -189,7 +183,7 @@ class Trainer:
                 raise ValueError("logger must be either 'tensorboard' or 'wandb'")
 
         logger.info("Training start...")
-        logger.info("\n{}".format(model))
+        logger.info("\n{}".format(self.model))
 
     def after_train(self):
         logger.info(
@@ -204,10 +198,10 @@ class Trainer:
 
         if self.epoch + 1 == self.max_epoch - self.exp.no_aug_epochs or self.no_aug:
             logger.info("--->No mosaic aug now!")
-            self.train_loader.close_mosaic()
+            self.train_loader._dataloader.close_mosaic()
             logger.info("--->Add additional L1 loss now!")
             if self.is_distributed:
-                self.model.module.head.use_l1 = True
+                self.model._module.module.head.use_l1 = True
             else:
                 self.model.head.use_l1 = True
             self.exp.eval_interval = 1
@@ -352,7 +346,7 @@ class Trainer:
 
     def save_ckpt(self, ckpt_name, update_best_ckpt=False, ap=None):
         if self.rank == 0:
-            save_model = self.ema_model.ema if self.use_model_ema else self.model
+            save_model = self.ema_model.ema if self.use_model_ema else self.model.module
             logger.info("Save weights to {}".format(self.file_name))
             ckpt_state = {
                 "start_epoch": self.epoch + 1,

@@ -8,7 +8,6 @@ import warnings
 from loguru import logger
 
 import torch
-import torch.backends.cudnn as cudnn
 
 from yolox.core import launch
 from yolox.exp import Exp, get_exp
@@ -96,6 +95,26 @@ def make_parser():
         default=None,
         nargs=argparse.REMAINDER,
     )
+    parser.add_argument(
+        "--num_processes", default=1, type=int,
+        help="num of processes in distributed training"
+    )
+    parser.add_argument(
+        "--use_ipex",
+        default=False,
+        action="store_true",
+        help="whether use ipex acceleration"
+    )
+    parser.add_argument(
+        "--strategy", default="subprocess", type=str,
+        help="distributed backend"
+    )
+    parser.add_argument(
+        "--precision",
+        type=str,
+        default="32",
+        help="different precision types for training"
+    )
     return parser
 
 
@@ -104,17 +123,10 @@ def main(exp: Exp, args):
     if exp.seed is not None:
         random.seed(exp.seed)
         torch.manual_seed(exp.seed)
-        cudnn.deterministic = True
-        warnings.warn(
-            "You have chosen to seed training. This will turn on the CUDNN deterministic setting, "
-            "which can slow down your training considerably! You may see unexpected behavior "
-            "when restarting from checkpoints."
-        )
 
     # set environment variables for distributed training
     configure_nccl()
     configure_omp()
-    cudnn.benchmark = True
 
     trainer = exp.get_trainer(args)
     trainer.train()

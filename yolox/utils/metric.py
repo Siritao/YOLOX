@@ -102,7 +102,7 @@ class MeterBuffer(defaultdict):
     """Computes and stores the average and current value"""
 
     def __init__(self, window_size=20):
-        factory = functools.partial(AverageMeter, window_size=window_size)
+        factory = functools.partial(AverageMeter, window_size=10)
         super().__init__(factory)
 
     def reset(self):
