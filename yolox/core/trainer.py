@@ -212,7 +212,7 @@ class Trainer(TorchNano):
         self.save_ckpt(ckpt_name="latest")
 
         if (self.epoch + 1) % self.exp.eval_interval == 0:
-            all_reduce_norm(self.model)
+            all_reduce_norm(self.model.module)
             self.evaluate_and_save_model()
 
     def before_iter(self):
