@@ -133,7 +133,7 @@ class COCOEvaluator:
         """
         # TODO half to amp_test
         tensor_type = torch.cuda.HalfTensor if half else torch.cuda.FloatTensor
-        model = model.eval()
+        # model = model.eval()
         if half:
             model = model.half()
         ids = []
