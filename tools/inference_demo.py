@@ -12,9 +12,7 @@ from yolox.models.network_blocks import SiLU
 from yolox.utils import replace_module
 from yolox.evaluators.coco_evaluator import COCOEvaluator
 
-from patch_gpu_to_cpu import patch_cuda
-
-from bigdl.nano.pytorch import InferenceOptimizer
+from bigdl.nano.pytorch import InferenceOptimizer, patch_torch
 
 
 def make_parser():
@@ -69,8 +67,6 @@ def main():
     logger.info("loading checkpoint done.")
 
     dummy_input = torch.randn(args.batch_size, 3, exp.test_size[0], exp.test_size[1], requires_grad=False)
-    # preds = model(dummy_input).detach()
-    # train_set = TensorDataset(dummy_input, preds)
     train_set = TensorDataset(dummy_input)
     train_loader = DataLoader(train_set, batch_size=args.batch_size)
     # train_loader = exp.get_data_loader(args.batch_size, False)
@@ -85,10 +81,9 @@ def main():
 
     inference_optimizer = InferenceOptimizer()
     inference_optimizer.optimize(model, metric=metric, training_data=train_loader)
-    # inference_optimizer.trace(model, accelerator='jit', input_sample=dummy_input)
-    # inference_optimizer.quantize(model, precision = 'int8')
+    # inference_optimizer.quantize(model, precision = 'int8', calib_dataloader = train_loader)
     inference_optimizer.summary()
 
 if __name__ == "__main__":
-    patch_cuda()
+    patch_torch(cuda_to_cpu=True)
     main()
