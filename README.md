@@ -28,7 +28,7 @@ python -m yolox.tools.train -n yolox_nano -b 64 --num_processes 4 --strategy sub
 * strategy – use which backend in distributed mode, defaults to ‘subprocess’, now avaiable backends are ‘spawn’, ‘subprocess’ and ‘ray’
 * precision – Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16), defaults to 32. Enable ipex bfloat16 weight prepack when use_ipex=True and precision=’bf16’
 ### Accelerating results
-Below accelerations were obtained on 4 Intel Xeon Cooper Lake CPUs (each has 56 logical cores) by counting the average execution time of first two epochs.
+Below accelerations were obtained on 4 Intel Xeon Cooper Lake CPUs (each has 56 logical cores) by counting the average execution time of first two epochs (batch size=64).
 * single process: 20200s
 * single process with ipex: 16329s, __80.8%__ of single process cost
 * 2 processes: 7466s, __37.0%__ of single process cost
@@ -40,7 +40,7 @@ Below accelerations were obtained on 4 Intel Xeon Cooper Lake CPUs (each has 56 
 python -m yolox.tools.inference_demo -n yolox_nano -b 64 -c /path/to/your/model
 ```
 ### Summarization of optimizing approaches
-|method|status|latency(ms)|accuracy|
+|method|status|latency(ms)[^1]|accuracy|
 |----|----|----|----|
 |            original            |      successful      |   213.539    |        0.411         |
 |           fp32_ipex            |      successful      |   225.013    |    not recomputed    |
@@ -56,6 +56,7 @@ python -m yolox.tools.inference_demo -n yolox_nano -b 64 -c /path/to/your/model
 |    onnxruntime_int8_qlinear    |   fail to convert    |     None     |         None         |
 |    onnxruntime_int8_integer    |   fail to convert    |     None     |         None         |
 
+[^1]: includes a batch of 64 samples.
 ### Known issue
-* GPU-CPU patch tool cannot support jit trace
-* int8 quantization will lead to 0 accuracy
+* GPU-CPU patch tool cannot support jit
+* int8 quantization will lead to zero accuracy
