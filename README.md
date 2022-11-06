@@ -40,19 +40,20 @@ Below accelerations were obtained on 4 Intel Xeon Cooper Lake CPUs (each has 56 
 python -m yolox.tools.inference_demo -n yolox_nano -b 64 -c /path/to/your/model
 ```
 ### Summarization of optimizing approaches
+Taking yolox_nano as an example:
 |method|status|latency(ms)[^1]|accuracy|
 |----|----|----|----|
-|            original            |      successful      |   213.539    |        0.411         |
-|           fp32_ipex            |      successful      |   225.013    |    not recomputed    |
-|              bf16              |      successful      |   153.385    |        0.406         |
-|           bf16_ipex            |      successful      |   452.874    |         0.41         |
-|              int8              |      successful      |   202.647    |         0.0          |
+|            original            |      successful      |   211.241    |        0.411         |
+|           fp32_ipex            |      successful      |   169.729    |    not recomputed    |
+|              bf16              |      successful      |    140.93    |        0.406         |
+|           bf16_ipex            |      successful      |   458.091    |         0.41         |
+|              int8              |      successful      |   192.032    |         0.0          |
 |            jit_fp32            |   fail to convert    |     None     |         None         |
 |         jit_fp32_ipex          |   fail to convert    |     None     |         None         |
 |  jit_fp32_ipex_channels_last   |   fail to convert    |     None     |         None         |
-|         openvino_fp32          |      successful      |    173.06    |    not recomputed    |
+|         openvino_fp32          |      successful      |   219.841    |    not recomputed    |
 |         openvino_int8          |   fail to convert    |     None     |         None         |
-|        onnxruntime_fp32        |      successful      |   969.888    |    not recomputed    |
+|        onnxruntime_fp32        |      successful      |   891.936    |    not recomputed    |
 |    onnxruntime_int8_qlinear    |   fail to convert    |     None     |         None         |
 |    onnxruntime_int8_integer    |   fail to convert    |     None     |         None         |
 
