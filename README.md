@@ -28,7 +28,7 @@ python -m yolox.tools.train -n yolox_nano -b 64 --num_processes 4 --strategy sub
 * strategy – use which backend in distributed mode, defaults to ‘subprocess’, now avaiable backends are ‘spawn’, ‘subprocess’ and ‘ray’
 * precision – Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16), defaults to 32. Enable ipex bfloat16 weight prepack when use_ipex=True and precision=’bf16’
 ### Accelerating results
-Below accelerations were obtained on 4 Intel Xeon Cooper Lake CPUs (each has 56 logical cores) by counting the average execution time of first two epochs (batch size=64).
+Below accelerations were obtained on 4 Intel Xeon Cooper Lake CPUs (each has 56 logical cores) by counting the average execution time of the first two training epochs on yolox_nano (batch size=64).
 * single process: 20200s
 * single process with ipex: 16329s, __80.8%__ of single process cost
 * 2 processes: 7466s, __37.0%__ of single process cost
